@@ -1,0 +1,135 @@
+#include "suzuri-layouts.dtsi"
+
+#include <dt-bindings/zmk/matrix_transform.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <input/processors.dtsi>
+#include <dt-bindings/zmk/bt.h>
+#include <dt-bindings/zmk/input_transform.h>
+
+/ {
+    chosen {
+        // zmk,kscan = &kscan0;
+        // zmk,matrix_transform = &default_transform;
+        zmk,physical-layout = &suzuri_physical_layout;
+    };
+
+    kscan0: kscan0 {
+        compatible = "zmk,kscan-gpio-matrix";
+        diode-direction = "col2row";
+        wakeup-source;
+
+        col-gpios
+            = <&xiao_d 0 GPIO_ACTIVE_HIGH>
+            , <&xiao_d 1 GPIO_ACTIVE_HIGH>
+            ;
+
+        row-gpios
+            = <&xiao_d 2 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+            , <&xiao_d 3 (GPIO_ACTIVE_HIGH | GPIO_PULL_DOWN)>
+            ;
+    };
+
+    default_transform: keymap_transform0 {
+        compatible = "zmk,matrix-transform";
+        columns = <2>; // Length of the "col-gpios" array
+        rows = <2>; // Length of the "row-gpios" array
+        map = <
+        //   Key 1 | Key 2
+            RC(1,0) RC(1,1)
+        //   Key 3 | Key 4
+            RC(0,0) RC(0,1)
+        >;
+    };
+
+    // 直接GPIO kscanの定義
+    bt_control_kscan: bt_control_kscan {
+        compatible = "zmk,kscan-gpio-direct";
+        wakeup-source;
+        debounce-press-ms = <10>;
+        debounce-release-ms = <10>;
+        input-gpios
+            = <&xiao_d 8 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>  // d8 for BT_CLR
+            , <&xiao_d 9 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>  // d9 for BT_NXT
+            ;
+    };
+
+    // Kscan Sideband Behavior Driverの設定
+    bt_sideband_behaviors {
+        compatible = "zmk,kscan-sideband-behaviors";
+
+        auto-enable;
+        kscan = <&bt_control_kscan>;
+
+        bt_clear_sideband: bt_clear_sideband {
+            column = <0>;  // d8に対応
+            bindings = <&bt BT_CLR>;
+        };
+
+        bt_next_sideband: bt_next_sideband {
+            column = <1>;  // d9に対応
+            bindings = <&bt BT_NXT>;
+        };
+    };
+
+};
+
+&pinctrl {
+    spi0_default: spi0_default {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 0, 5)>, //SCLK
+                    <NRF_PSEL(SPIM_MOSI, 0, 4)>, //SDIO
+                    <NRF_PSEL(SPIM_MISO, 0, 4)>; //SDIO
+        };
+    };
+
+    spi0_sleep: spi0_sleep {
+        group1 {
+            psels = <NRF_PSEL(SPIM_SCK, 0, 5)>, //SCLK
+                    <NRF_PSEL(SPIM_MOSI, 0, 4)>, //SDIO
+                    <NRF_PSEL(SPIM_MISO, 0, 4)>; //SDIO
+            low-power-enable;
+        };
+    };
+};
+
+&spi0 {
+    status = "okay";
+    compatible = "nordic,nrf-spim";
+    pinctrl-0 = <&spi0_default>;
+    pinctrl-1 = <&spi0_sleep>;
+    pinctrl-names = "default", "sleep";
+    cs-gpios = <&xiao_d 7 GPIO_ACTIVE_LOW>; //NCS
+
+    trackball: trackball@0 {
+        status = "okay";
+        compatible = "pixart,pmw3610";
+        reg = <0>;
+        spi-max-frequency = <2000000>;
+        irq-gpios = <&xiao_d 10 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>; //MOT
+        cpi = <1200>;
+        evt-type = <INPUT_EV_REL>;
+        x-input-code = <INPUT_REL_X>;
+        y-input-code = <INPUT_REL_Y>;
+    };
+};
+
+/ {
+    trackball_listener {
+        // Input Processor を使用して、トラックボールの入力を処理できます。
+        // 参考 https://zmk.dev/docs/keymaps/input-processors
+        compatible = "zmk,input-listener";
+        device = <&trackball>;
+        input-processors = 
+            <&zip_x_scaler 9 8>, // X軸（横方向）の移動量を1.125倍に調整。倍率を大きくすると、Y軸（縦方向）の移動時に横ブレを感じやすくなります。
+            <&zip_xy_transform INPUT_TRANSFORM_X_INVERT>; // X軸反転
+
+        scroller {
+            layers = <1>;
+            input-processors =
+                <&zip_xy_to_scroll_mapper>,
+                <&zip_scroll_transform INPUT_TRANSFORM_Y_INVERT>, // Y軸反転
+                <&zip_scroll_scaler 1 40>; // スクロール速度を1/40に調整
+            process-next;
+        };
+    };
+};

@@ -1,0 +1,9 @@
+file_format: "1"
+id: suzuri
+name: SUZURI
+type: shield
+url: https://github.com/snize/zmk-keyboard-suzuri
+requires: [seeed_xiao]
+features:
+  - keys
+  - pointer
