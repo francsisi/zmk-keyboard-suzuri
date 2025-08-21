@@ -23,7 +23,7 @@ SUZURIは文字通り書道で利用する「すずり」をイメージして�
 
 ## サポート
 
-準備中
+サポートはDiscussionsで行っています。質問や問題がある場合は、[Discussions](https://github.com/snize/zmk-keyboard-suzuri/discussions)をご利用ください。
 
 ## 免責事項
 
