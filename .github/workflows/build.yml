@@ -1,11 +1,13 @@
 name: Build & Release
 
+
 on:
   push:
     branches:
       - '**'
     tags:
       - 'v*.*.*'
+  workflow_call:
 
 permissions:
   contents: read
